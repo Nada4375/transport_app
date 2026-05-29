@@ -1,0 +1,26 @@
+name: geoatelier
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.11
+
+  # Django backend
+  - django=5.2
+  - djangorestframework
+  - django-cors-headers
+
+  # GeoDjango (GIS stack)
+  - gdal
+  - geos
+  - proj
+  - libspatialite
+
+  # Database driver
+  - psycopg2-binary
+
+  # utilities
+  - pip
+  - pip:
+      - pillow
+      - requests

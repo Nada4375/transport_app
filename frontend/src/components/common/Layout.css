@@ -1,0 +1,11 @@
+/* Layout styles are in global.css */.sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
