@@ -179,18 +179,8 @@ export default function TransporterDashboard() {
       {profile && (
         <div className="tp-profile-card">
           <div className="tp-profile-grid">
-            <div>
-              <h2>{profile.company_name}</h2>
-              <p className="tp-td-muted">@{profile.username}</p>
-            </div>
+           
 
-            <div className="tp-profile-details">
-              {profile.responsable_name && <span>👤 {profile.responsable_name}</span>}
-              {profile.city && <span>📍 {profile.city}</span>}
-              {profile.phone && <span>📞 {profile.phone}</span>}
-              {profile.email && <span>✉️ {profile.email}</span>}
-              {profile.local_address && <span>🏠 {profile.local_address}</span>}
-            </div>
           </div>
         </div>
       )}

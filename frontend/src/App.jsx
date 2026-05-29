@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import AdminTransporters from './pages/admin/Transporters';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from './store/authStore';
@@ -65,6 +66,7 @@ export default function App() {
           <Route index element={<AdminDashboard />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="validation" element={<AdminValidation />} />
+          <Route path="transporters" element={<AdminTransporters />} />
           <Route path="map" element={<AdminMap />} />
         </Route>
 

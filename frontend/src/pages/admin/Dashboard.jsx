@@ -1,140 +1,150 @@
-// ============================================================
-//  admin/Dashboard.jsx  —  TransportHub
-//  Modifications :
-//   - Suppression TOTALE des MOCK_STATS, MOCK_ASSIGNMENTS,
-//     MOCK_VEHICLES, MOCK_DRIVERS (Karim, Sara, Youssef…)
-//   - Stats réelles depuis GET /api/orders/stats/
-//   - Commandes récentes réelles depuis GET /api/orders/
-//   - Véhicules réels depuis GET /api/vehicles/vehicles/
-//   - Chauffeurs réels depuis GET /api/vehicles/drivers/
-//   - Delivery rate, active routes calculés depuis vraies données
-//   - Dates en toLocaleString('fr-MA')
-//   - Routes admin : /admin/orders, /admin/map
-// ============================================================
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import './Transporter.css';
 import {
-  Truck, Package, Users, ClipboardList, RefreshCw, CheckCircle,
+  Truck, Users, ClipboardList, RefreshCw, CheckCircle,
   Clock, Map, ArrowRight, TrendingUp, AlertCircle, RefreshCcw, Star
 } from 'lucide-react';
 
-// ── Config statuts backend réels ────────────────────────────
+import {
+  ordersAPI,
+  vehiclesAPI,
+  driversAPI,
+  transportersAPI,
+} from '../../services/api';
+
+import '../transporter/Transporter.css';
+
 const STATUS_CONFIG = {
-  pending:    { label: 'En attente',  cls: 'badge-gray'   },
-  validated:  { label: 'Validée',     cls: 'badge-orange' },
-  assigned:   { label: 'Assignée',    cls: 'badge-orange' },
-  in_transit: { label: 'En transit',  cls: 'badge-blue'   },
-  delivered:  { label: 'Livrée',      cls: 'badge-green'  },
-  cancelled:  { label: 'Annulée',     cls: 'badge-red'    },
-  on_mission: { label: 'En mission',  cls: 'badge-blue'   },
-  available:  { label: 'Disponible',  cls: 'badge-green'  },
-  maintenance:{ label: 'Maintenance', cls: 'badge-red'    },
-  idle:       { label: 'Inactif',     cls: 'badge-gray'   },
-  on_delivery:{ label: 'En livraison',cls: 'badge-blue'   },
-  offline:    { label: 'Hors ligne',  cls: 'badge-gray'   },
+  pending: { label: 'En attente', cls: 'badge-gray' },
+  validated: { label: 'Validée', cls: 'badge-orange' },
+  assigned: { label: 'Assignée', cls: 'badge-orange' },
+  in_transit: { label: 'En transit', cls: 'badge-blue' },
+  delivered: { label: 'Livrée', cls: 'badge-green' },
+  cancelled: { label: 'Annulée', cls: 'badge-red' },
+  on_mission: { label: 'En mission', cls: 'badge-blue' },
+  available: { label: 'Disponible', cls: 'badge-green' },
+  maintenance: { label: 'Maintenance', cls: 'badge-red' },
+  idle: { label: 'Inactif', cls: 'badge-gray' },
+  on_delivery: { label: 'En livraison', cls: 'badge-blue' },
+  offline: { label: 'Hors ligne', cls: 'badge-gray' },
 };
 
 function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIG[status] || { label: status, cls: 'badge-gray' };
+  const cfg = STATUS_CONFIG[status] || { label: status || '—', cls: 'badge-gray' };
   return <span className={`tp-badge ${cfg.cls}`}>{cfg.label}</span>;
 }
 
 function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('fr-MA', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
-  // ── État — AUCUNE mock data ────────────────────────────────
-  const [stats,    setStats]    = useState(null);
-  const [orders,   setOrders]   = useState([]);
+  const [stats, setStats] = useState(null);
+  const [orders, setOrders] = useState([]);
   const [vehicles, setVehicles] = useState([]);
-  const [drivers,  setDrivers]  = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState(null);
+  const [drivers, setDrivers] = useState([]);
+  const [transporters, setTransporters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const load = async () => {
     setLoading(true);
     setError(null);
+
     try {
-      const [statsRes, ordersRes, vRes, dRes] = await Promise.allSettled([
-        axios.get('/api/orders/stats/'),
-        axios.get('/api/orders/'),
-        axios.get('/api/vehicles/vehicles/'),
-        axios.get('/api/vehicles/drivers/'),
+      const [statsRes, ordersRes, vRes, dRes, tRes] = await Promise.allSettled([
+        ordersAPI.stats(),
+        ordersAPI.list(),
+        vehiclesAPI.list(),
+        driversAPI.list(),
+        transportersAPI.list(),
       ]);
 
-      // Stats globales
       if (statsRes.status === 'fulfilled') {
         setStats(statsRes.value.data);
       }
 
-      // Commandes récentes (6 dernières)
       if (ordersRes.status === 'fulfilled') {
-        const data = ordersRes.value.data.results || ordersRes.value.data;
+        const data = ordersRes.value.data.results || ordersRes.value.data || [];
         setOrders(Array.isArray(data) ? data.slice(0, 6) : []);
       }
 
-      // Véhicules (4 premiers)
       if (vRes.status === 'fulfilled') {
-        const data = vRes.value.data.results || vRes.value.data;
-        setVehicles(Array.isArray(data) ? data.slice(0, 4) : []);
+        const data = vRes.value.data.results || vRes.value.data || [];
+        setVehicles(Array.isArray(data) ? data.slice(0, 5) : []);
       }
 
-      // Chauffeurs (4 premiers)
       if (dRes.status === 'fulfilled') {
-        const data = dRes.value.data.results || dRes.value.data;
-        setDrivers(Array.isArray(data) ? data.slice(0, 4) : []);
+        const data = dRes.value.data.results || dRes.value.data || [];
+        setDrivers(Array.isArray(data) ? data.slice(0, 5) : []);
       }
 
-    } catch {
+      if (tRes.status === 'fulfilled') {
+        const data = tRes.value.data.results || tRes.value.data || [];
+        setTransporters(Array.isArray(data) ? data.slice(0, 5) : []);
+      }
+    } catch (err) {
+      console.error('ADMIN DASHBOARD ERROR:', err);
       setError('Erreur de connexion au serveur.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-  // ── Cartes stats calculées depuis vraies données ──────────
-  const statCards = stats ? [
+  const totalOrders = stats?.total_orders ?? stats?.total ?? orders.length;
+  const pendingCount = stats?.pending_count ?? orders.filter(o => o.status === 'pending').length;
+  const validatedCount = stats?.validated_count ?? orders.filter(o => o.status === 'validated').length;
+  const activeRoutes = stats?.active_routes ?? orders.filter(o => ['assigned', 'in_transit'].includes(o.status)).length;
+  const deliveredCount = orders.filter(o => o.status === 'delivered').length;
+  const deliveryRate = totalOrders > 0 ? Math.round((deliveredCount / totalOrders) * 100) : 0;
+
+  const statCards = [
     {
       icon: <ClipboardList size={20} />,
       label: 'Total commandes',
-      value: stats.total ?? 0,
+      value: totalOrders,
       color: 'blue',
+      action: () => navigate('/admin/orders'),
     },
     {
       icon: <Clock size={20} />,
       label: 'En attente',
-      value: stats.pending_count ?? 0,
+      value: pendingCount,
       color: 'gray',
       action: () => navigate('/admin/validation'),
     },
     {
       icon: <CheckCircle size={20} />,
-      label: 'Validées (à assigner)',
-      value: stats.validated_count ?? 0,
+      label: 'Validées à assigner',
+      value: validatedCount,
       color: 'orange',
       action: () => navigate('/admin/validation'),
     },
     {
       icon: <RefreshCw size={20} />,
       label: 'Routes actives',
-      value: stats.active_routes ?? 0,
+      value: activeRoutes,
       color: 'blue',
+      action: () => navigate('/admin/map'),
     },
     {
       icon: <TrendingUp size={20} />,
       label: 'Taux de livraison',
-      value: `${stats.delivery_rate ?? 0}%`,
+      value: `${deliveryRate}%`,
       color: 'green',
     },
     {
@@ -149,47 +159,49 @@ export default function AdminDashboard() {
       value: drivers.filter(d => d.status === 'available').length,
       color: 'green',
     },
-  ] : [];
+  ];
 
   return (
     <div className="tp-page">
-
-      {/* Header */}
       <div className="tp-page-header">
         <div>
           <h1 className="tp-page-title">Dashboard Admin</h1>
           <p className="tp-page-sub">Vue globale de la plateforme TransportHub</p>
         </div>
+
         <div className="tp-header-actions">
           <button className="tp-btn-secondary" onClick={load} title="Actualiser">
             <RefreshCcw size={15} />
           </button>
+
           <button className="tp-btn-primary" onClick={() => navigate('/admin/validation')}>
             Valider / Assigner <ArrowRight size={16} />
           </button>
+
           <button className="tp-btn-secondary" onClick={() => navigate('/admin/map')}>
             <Map size={15} /> Carte live
           </button>
         </div>
       </div>
 
-      {/* Erreur */}
       {error && (
         <div className="tp-alert-error">
           <AlertCircle size={16} /> {error}
         </div>
       )}
 
-      {/* Alerte : commandes en attente */}
-      {stats && stats.pending_count > 0 && (
-        <div className="tp-alert-warning" style={{ cursor: 'pointer' }} onClick={() => navigate('/admin/validation')}>
+      {pendingCount > 0 && (
+        <div
+          className="tp-alert-warning"
+          style={{ cursor: 'pointer' }}
+          onClick={() => navigate('/admin/validation')}
+        >
           <AlertCircle size={16} />
-          <strong>{stats.pending_count} commande{stats.pending_count > 1 ? 's' : ''} en attente</strong>
-          de validation — Cliquez pour traiter
+          <strong>{pendingCount} commande{pendingCount > 1 ? 's' : ''} en attente</strong>
+          de validation.
         </div>
       )}
 
-      {/* Stat cards */}
       {loading ? (
         <div className="tp-empty">Chargement des données…</div>
       ) : (
@@ -210,8 +222,6 @@ export default function AdminDashboard() {
       )}
 
       <div className="tp-dash-grid">
-
-        {/* Commandes récentes */}
         <div className="tp-card wide">
           <div className="tp-card-header">
             <h2>Commandes récentes</h2>
@@ -238,6 +248,7 @@ export default function AdminDashboard() {
                     <th></th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {orders.map(o => (
                     <tr key={o.id}>
@@ -266,21 +277,21 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* Statut véhicules */}
         <div className="tp-card">
           <div className="tp-card-header">
             <h2>Véhicules</h2>
           </div>
+
           {vehicles.length === 0 ? (
             <div className="tp-empty-small">Aucun véhicule.</div>
           ) : (
             <div className="tp-list">
               {vehicles.map(v => (
                 <div key={v.id} className="tp-list-item">
-                  <div className="tp-list-icon"><Truck size={22} strokeWidth={1.5} /></div>
+                  <div className="tp-list-icon"><Truck size={22} /></div>
                   <div className="tp-list-body">
                     <strong>{v.plate_number}</strong>
-                    <small>{v.transporter_name || '—'}</small>
+                    <small>{v.transporter_name || v.vehicle_type || '—'}</small>
                   </div>
                   <StatusBadge status={v.status} />
                 </div>
@@ -289,11 +300,11 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* Statut chauffeurs */}
         <div className="tp-card">
           <div className="tp-card-header">
             <h2>Chauffeurs</h2>
           </div>
+
           {drivers.length === 0 ? (
             <div className="tp-empty-small">Aucun chauffeur.</div>
           ) : (
@@ -305,7 +316,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="tp-list-body">
                     <strong>{d.first_name} {d.last_name}</strong>
-                    <small>{d.transporter_name || '—'}</small>
+                    <small>{d.phone || '—'}</small>
                   </div>
                   <StatusBadge status={d.status} />
                 </div>
@@ -314,29 +325,33 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* Top transporteurs */}
-        {stats?.top_transporters?.length > 0 && (
-          <div className="tp-card">
-            <div className="tp-card-header">
-              <h2>Top Transporteurs</h2>
-            </div>
+        <div className="tp-card">
+          <div className="tp-card-header">
+            <h2>Transporteurs</h2>
+            <button className="tp-link" onClick={() => navigate('/admin/transporters')}>
+              Tout voir
+            </button>
+          </div>
+
+          {transporters.length === 0 ? (
+            <div className="tp-empty-small">Aucun transporteur.</div>
+          ) : (
             <div className="tp-list">
-              {stats.top_transporters.map((t, i) => (
-                <div key={i} className="tp-list-item">
-                  <div className="tp-list-avatar" style={{ background: 'var(--g-100)', color: 'var(--stone)', fontWeight: 700 }}>
-                    {i + 1}
+              {transporters.map(t => (
+                <div key={t.id} className="tp-list-item">
+                  <div className="tp-list-avatar">
+                    {(t.company_name || 'T')[0].toUpperCase()}
                   </div>
                   <div className="tp-list-body">
-                    <strong>{t.transporter__company_name || '—'}</strong>
-                    <small>{t.deliveries} livraison{t.deliveries > 1 ? 's' : ''}</small>
+                    <strong>{t.company_name || '—'}</strong>
+                    <small>{t.city || '—'} · {t.phone || '—'}</small>
                   </div>
                   <Star size={14} color="var(--g-400)" />
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
+          )}
+        </div>
       </div>
     </div>
   );
