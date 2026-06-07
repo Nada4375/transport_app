@@ -105,7 +105,7 @@ def find_best_transporter(order):
             logs.append(f'  ✗ {name}: no drivers registered')
             continue
 
-        driver = all_d.filter(is_available=True).first()
+        driver = all_d.filter(status='available').first()
         if not driver:
             logs.append(f'  ✗ {name}: all {all_d.count()} driver(s) on duty')
             continue
@@ -150,12 +150,13 @@ def auto_assign_order(order):
     order.assigned_at = timezone.now()
     order.save()
 
+
     # Mark resources as busy
     vehicle.status = 'on_mission'
-    vehicle.save()
+    vehicle.save(update_fields=['status'])
 
-    driver.is_available = False
-    driver.save()
+    driver.status = 'on_delivery'
+    driver.save(update_fields=['status', 'is_available'])
 
     # Calculate real road route via OSRM
     route_info = ''

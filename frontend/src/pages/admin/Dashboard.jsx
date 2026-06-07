@@ -46,6 +46,24 @@ function fmtDate(iso) {
   });
 }
 
+function getTransporterId(item) {
+  const raw =
+    item?.transporter_id ??
+    item?.transporter ??
+    item?.transporter?.id ??
+    item?.owner_id ??
+    item?.owner?.id;
+
+  return raw == null ? null : Number(raw);
+}
+
+function transporterNameById(transporters, id) {
+  if (!id) return 'Transporteur non défini';
+  const t = transporters.find((x) => Number(x.id) === Number(id));
+  return t?.company_name || t?.username || `Transporteur #${id}`;
+}
+
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
@@ -291,7 +309,13 @@ export default function AdminDashboard() {
                   <div className="tp-list-icon"><Truck size={22} /></div>
                   <div className="tp-list-body">
                     <strong>{v.plate_number}</strong>
-                    <small>{v.brand} {v.model} · {v.capacity_kg} kg</small>
+                    <small>
+                      {v.brand} {v.model} · {v.capacity_kg} kg
+                      <br />
+                      <span className="tp-td-muted">
+                        Transporteur : {v.transporter_name || transporterNameById(transporters, getTransporterId(v))}
+                      </span>
+                    </small>
                   </div>
                   <StatusBadge status={v.status} />
                 </div>
@@ -316,7 +340,13 @@ export default function AdminDashboard() {
                   </div>
                   <div className="tp-list-body">
                     <strong>{d.first_name} {d.last_name}</strong>
-                    <small>{d.phone || '—'}</small>
+                    <small>
+                      {d.phone || '—'}
+                      <br />
+                      <span className="tp-td-muted">
+                        Transporteur : {d.transporter_name || transporterNameById(transporters, getTransporterId(d))}
+                      </span>
+                    </small>
                   </div>
                   <StatusBadge status={d.is_available ? 'available' : 'on_delivery'} />
                 </div>

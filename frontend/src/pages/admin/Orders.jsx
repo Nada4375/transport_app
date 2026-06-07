@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, RefreshCcw, Map, Filter } from 'lucide-react';
+import { Search, RefreshCcw, Map, CalendarDays, MapPin, Flag } from 'lucide-react';
 import { ordersAPI } from '../../services/api';
 import '../transporter/Transporter.css';
 
@@ -25,6 +25,51 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleString('fr-MA', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function fmtDay(iso) {
+  if (!iso) return 'Date non définie';
+  return new Date(iso).toLocaleDateString('fr-MA', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function normalize(value) {
+  return String(value || '—').trim().toLowerCase();
+}
+
+function groupOrders(list) {
+  const map = new window.Map();
+
+  list.forEach((o) => {
+    // On regroupe par même date + même ville départ + même destination.
+    // desired_date est prioritaire si elle existe, sinon created_at.
+    const dateValue = o.desired_date || o.pickup_date || o.created_at;
+    const dayKey = dateValue ? new window.Date(dateValue).toISOString().slice(0, 10) : 'no-date';
+    const dep = normalize(o.departure_city || o.departure_address);
+    const dest = normalize(o.destination_city || o.destination_address);
+    const key = `${dayKey}__${dep}__${dest}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        dateValue,
+        departure: o.departure_city || o.departure_address || '—',
+        destination: o.destination_city || o.destination_address || '—',
+        orders: [],
+      });
+    }
+
+    map.get(key).orders.push(o);
+  });
+
+  return Array.from(map.values()).sort((a, b) => {
+    const da = a.dateValue ? new window.Date(a.dateValue).getTime() : 0;
+    const db = b.dateValue ? new window.Date(b.dateValue).getTime() : 0;
+    return db - da;
   });
 }
 
@@ -58,10 +103,14 @@ export default function AdminOrders() {
       (o.transporter_name || '').toLowerCase().includes(q) ||
       (o.driver_name || '').toLowerCase().includes(q) ||
       (o.departure_city || '').toLowerCase().includes(q) ||
-      (o.destination_city || '').toLowerCase().includes(q);
+      (o.destination_city || '').toLowerCase().includes(q) ||
+      (o.departure_address || '').toLowerCase().includes(q) ||
+      (o.destination_address || '').toLowerCase().includes(q);
     const matchStatus = statusFilter === 'all' || o.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  const grouped = groupOrders(filtered);
 
   const counts = ALL_STATUSES.reduce((acc, s) => {
     acc[s] = orders.filter(o => o.status === s).length;
@@ -74,7 +123,7 @@ export default function AdminOrders() {
         <div>
           <h1 className="tp-page-title">Toutes les commandes</h1>
           <p className="tp-page-sub">
-            {orders.length} commande{orders.length !== 1 ? 's' : ''} au total
+            {orders.length} commande{orders.length !== 1 ? 's' : ''} au total · regroupement par date, départ et destination
           </p>
         </div>
         <div className="tp-header-actions">
@@ -84,7 +133,6 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      {/* Status pills */}
       <div className="tp-status-pills">
         <button
           className={`tp-status-pill ${statusFilter === 'all' ? 'active' : ''}`}
@@ -105,7 +153,6 @@ export default function AdminOrders() {
         ))}
       </div>
 
-      {/* Search */}
       <div className="tp-filters">
         <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
           <Search size={15} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--g-400)', pointerEvents: 'none' }} />
@@ -129,62 +176,79 @@ export default function AdminOrders() {
         </select>
       </div>
 
-      {/* Table */}
       {loading ? (
         <div className="tp-empty">Chargement des commandes…</div>
-      ) : filtered.length === 0 ? (
+      ) : grouped.length === 0 ? (
         <div className="tp-empty">
           <strong>Aucune commande trouvée</strong>
           <span>Modifiez vos filtres de recherche.</span>
         </div>
       ) : (
-        <div className="tp-card" style={{ padding: 0 }}>
-          <div className="tp-table-wrap">
-            <table className="tp-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Client</th>
-                  <th>Départ</th>
-                  <th>Destination</th>
-                  <th>Marchandise</th>
-                  <th>Poids</th>
-                  <th>Transporteur</th>
-                  <th>Chauffeur</th>
-                  <th>Véhicule</th>
-                  <th>Date</th>
-                  <th>Statut</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(o => (
-                  <tr key={o.id}>
-                    <td><span className="tp-code">#{o.id}</span></td>
-                    <td><strong>{o.client_name || '—'}</strong></td>
-                    <td className="tp-td-muted">{o.departure_city || '—'}</td>
-                    <td className="tp-td-muted">{o.destination_city || '—'}</td>
-                    <td className="tp-td-muted">{o.merchandise_type || '—'}</td>
-                    <td className="tp-td-muted">{o.quantity_kg ? `${o.quantity_kg} kg` : '—'}</td>
-                    <td>{o.transporter_name || <span className="tp-td-muted">—</span>}</td>
-                    <td>{o.driver_name || <span className="tp-td-muted">—</span>}</td>
-                    <td>{o.vehicle_plate ? <span className="tp-code">{o.vehicle_plate}</span> : <span className="tp-td-muted">—</span>}</td>
-                    <td className="tp-td-muted">{fmtDate(o.created_at)}</td>
-                    <td><StatusBadge status={o.status} /></td>
-                    <td>
-                      <button
-                        className="tp-action-btn"
-                        onClick={() => navigate(`/admin/map?order=${o.id}`)}
-                        title="Voir sur la carte"
-                      >
-                        <Map size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="tp-grouped-orders">
+          {grouped.map((group) => (
+            <div key={group.key} className="tp-order-group">
+              <div className="tp-order-group-header">
+                <div>
+                  <h2>
+                    <CalendarDays size={17} />
+                    {fmtDay(group.dateValue)}
+                  </h2>
+                  <p>
+                    <MapPin size={14} /> {group.departure}
+                    <span>→</span>
+                    <Flag size={14} /> {group.destination}
+                  </p>
+                </div>
+
+                <span className="tp-badge badge-blue">
+                  {group.orders.length} commande{group.orders.length > 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div className="tp-table-wrap">
+                <table className="tp-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Client</th>
+                      <th>Marchandise</th>
+                      <th>Poids</th>
+                      <th>Transporteur</th>
+                      <th>Chauffeur</th>
+                      <th>Véhicule</th>
+                      <th>Date création</th>
+                      <th>Statut</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.orders.map(o => (
+                      <tr key={o.id}>
+                        <td><span className="tp-code">#{o.id}</span></td>
+                        <td><strong>{o.client_name || '—'}</strong></td>
+                        <td className="tp-td-muted">{o.merchandise_type || '—'}</td>
+                        <td className="tp-td-muted">{o.quantity_kg ? `${o.quantity_kg} kg` : '—'}</td>
+                        <td>{o.transporter_name || <span className="tp-td-muted">Non assigné</span>}</td>
+                        <td>{o.driver_name || <span className="tp-td-muted">—</span>}</td>
+                        <td>{o.vehicle_plate ? <span className="tp-code">{o.vehicle_plate}</span> : <span className="tp-td-muted">—</span>}</td>
+                        <td className="tp-td-muted">{fmtDate(o.created_at)}</td>
+                        <td><StatusBadge status={o.status} /></td>
+                        <td>
+                          <button
+                            className="tp-action-btn"
+                            onClick={() => navigate(`/admin/map?order=${o.id}`)}
+                            title="Voir sur la carte"
+                          >
+                            <Map size={15} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
