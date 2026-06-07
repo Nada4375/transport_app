@@ -3,7 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenRefreshView
-
+from apps.orders.debug_views import debug_distances
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.accounts.urls')),
@@ -12,5 +12,6 @@ urlpatterns = [
     path('api/vehicles/', include('apps.vehicles.urls')),
     path('api/tracking/', include('apps.tracking.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
+    path('api/debug/distances/', debug_distances),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

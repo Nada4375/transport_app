@@ -71,15 +71,29 @@ class OrderViewSet(viewsets.ModelViewSet):
         if order.status != 'pending':
             return Response({'error': 'Order is not pending.'}, status=400)
 
+        # Step 1: validate
         order.status = 'validated'
         order.validated_at = timezone.now()
         order.save()
 
-        return Response({
-            'message': 'Order validated.',
-            'order': OrderSerializer(order).data
-        })
+        # Step 2: immediately auto-assign using nearest transporter
+        from .assignment import auto_assign_order
+        success, message = auto_assign_order(order)
+        order.refresh_from_db()
 
+        if success:
+            return Response({
+                'message': f'✅ Validated & assigned. {message}',
+                'status': order.status,
+                'order': OrderSerializer(order).data
+            })
+        else:
+            return Response({
+                'message': f'✅ Validated. ⚠️ Auto-assignment failed: {message}',
+                'status': order.status,
+                'order': OrderSerializer(order).data
+            })
+    
     @action(detail=True, methods=['post'], url_path='assign')
     def assign_order(self, request, pk=None):
         if request.user.role != 'admin':
@@ -197,7 +211,20 @@ class OrderViewSet(viewsets.ModelViewSet):
             {'error': 'No available vehicle with available driver found.'},
             status=404
         )
-
+    @action(detail=True, methods=['post'], url_path='retry-assign')
+    def retry_assign(self, request, pk=None):
+        if request.user.role != 'admin':
+            return Response({'error': 'Admin only.'}, status=403)
+        order = self.get_object()
+        if order.status != 'validated':
+            return Response({'error': 'Order must be validated first.'}, status=400)
+        from .assignment import auto_assign_order
+        success, message = auto_assign_order(order)
+        order.refresh_from_db()
+        if success:
+            return Response({'message': message, 'order': OrderSerializer(order).data})
+        else:
+            return Response({'error': message}, status=404)
     @action(detail=True, methods=['post'], url_path='start')
     def start_delivery(self, request, pk=None):
         order = self.get_object()
@@ -265,18 +292,13 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='stats')
     def stats(self, request):
-        if request.user.role != 'admin':
+        print("USER:", request.user)
+        print("ROLE:", getattr(request.user, "role", None))
+
+        if getattr(request.user, "role", None) != 'admin':
             return Response({'error': 'Admin only.'}, status=403)
 
+        from django.db.models import Count
         total = Order.objects.count()
-
-        by_status = (
-            Order.objects
-            .values('status')
-            .annotate(count=Count('id'))
-        )
-
-        return Response({
-            'total_orders': total,
-            'by_status': list(by_status),
-        })
+        by_status = Order.objects.values('status').annotate(count=Count('id'))
+        return Response({'total': total, 'by_status': list(by_status)})
