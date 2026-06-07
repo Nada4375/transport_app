@@ -151,7 +151,7 @@ export default function TransporterOrders() {
               className={`tp-status-pill ${statusFilter === s ? 'active' : ''}`}
               onClick={() => setStatusFilter(statusFilter === s ? 'all' : s)}
             >
-              <Icon size={13} strokeWidth={2} />
+              {React.createElement(Icon, { size: 13, strokeWidth: 2 })}
               {label}
               {counts[s] > 0 && <span className="tp-status-count">{counts[s]}</span>}
             </button>
@@ -219,7 +219,7 @@ export default function TransporterOrders() {
                   <div className="tp-order-id">
                     <span className="tp-code">#{order.id}</span>
                     <span className={`tp-badge ${st.cls}`}>
-                      <st.Icon size={11} strokeWidth={2.5} />
+                      {React.createElement(st.Icon, { size: 11, strokeWidth: 2.5 })}
                       {st.label}
                     </span>
                   </div>
@@ -330,7 +330,9 @@ export default function TransporterOrders() {
                           disabled={isActioning}
                           onClick={() => markDelivered(order)}
                         >
-                          <CheckCircle size={14} />
+                          {React.createElement(CheckCircle, { size: 14 })}
+                          {React.createElement(Play, { size: 14 })}
+                          {React.createElement(Navigation, { size: 14 })}
                           {isActioning ? 'Confirmation…' : 'Marquer comme livré'}
                         </button>
                       )}

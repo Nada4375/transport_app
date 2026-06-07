@@ -1,83 +1,135 @@
-import React, { useEffect, useState } from 'react';
-import '../transporter/Transporter.css';
+import React, { useEffect, useState, useRef } from 'react';
 import { trackingAPI, ordersAPI } from '../../services/api';
-import MapView from '../../components/map/MapView';
-import '../transporter/Transporter.css';
+import LiveMap from '../../components/map/LiveMap';
 
 export default function AdminMap() {
   const [positions, setPositions] = useState([]);
-  const [geoOrders, setGeoOrders] = useState([]);
+  const [stats, setStats] = useState({ in_transit: 0, assigned: 0, pending: 0 });
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const intervalRef = useRef(null);
 
-  const load = async () => {
+  const fetchData = async () => {
     try {
-      const posRes = await trackingAPI.livePositions();
-      const posData = posRes.data || [];
+      const [posRes, statsRes] = await Promise.all([
+        trackingAPI.livePositions(),
+        ordersAPI.stats(),
+      ]);
+      setPositions(posRes.data || []);
 
-      setPositions(
-        Array.isArray(posData)
-          ? posData.map((p) => ({
-              lat: p.latitude,
-              lng: p.longitude,
-              plate: p.plate,
-              speed: p.speed || 0,
-            }))
-          : []
-      );
-    } catch {
-      setPositions([]);
-    }
-
-    try {
-      const ordersRes = await ordersAPI.list();
-      const data = ordersRes.data.results || ordersRes.data || [];
-
-      setGeoOrders(
-        Array.isArray(data)
-          ? data.filter((o) => ['assigned', 'in_transit'].includes(o.status))
-          : []
-      );
-    } catch {
-      setGeoOrders([]);
+      const byStatus = statsRes.data.by_status || [];
+      setStats({
+        in_transit: byStatus.find(s => s.status === 'in_transit')?.count || 0,
+        assigned: byStatus.find(s => s.status === 'assigned')?.count || 0,
+        pending: byStatus.find(s => s.status === 'pending')?.count || 0,
+      });
+      setLastUpdate(new Date());
+    } catch (err) {
+      console.error('Admin map error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
-
-    const interval = setInterval(load, 10000);
-
-    return () => clearInterval(interval);
+    fetchData();
+    intervalRef.current = setInterval(fetchData, 5000);
+    return () => clearInterval(intervalRef.current);
   }, []);
 
   return (
-    <div className="tp-page">
-      <div className="tp-page-header">
-        <div>
-          <h1 className="tp-page-title">Map Overview</h1>
-          <p className="tp-page-sub">Suivi global des livraisons actives</p>
+    <div className="page-container">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h1 className="page-title" style={{ margin: 0 }}>Vue globale — Toutes les livraisons 🗺️</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1D9E75', animation: 'pulse 2s infinite' }} />
+          <span style={{ fontSize: 12, color: '#888' }}>
+            {positions.length} camion(s) actif(s) · {lastUpdate ? lastUpdate.toLocaleTimeString() : '...'}
+          </span>
         </div>
       </div>
 
-      <div className="tp-stats-grid" style={{ marginBottom: 14 }}>
-        <div className="tp-stat-card accent-blue">
-          <div className="tp-stat-val">{positions.length}</div>
-          <div className="tp-stat-label">Véhicules GPS</div>
+      <div className="stats-grid" style={{ marginBottom: 12 }}>
+        <div className="stat-card">
+          <div className="stat-value" style={{ color: '#378ADD' }}>{positions.length}</div>
+          <div className="stat-label">En transit</div>
         </div>
-
-        <div className="tp-stat-card accent-orange">
-          <div className="tp-stat-val">{geoOrders.length}</div>
-          <div className="tp-stat-label">Livraisons actives</div>
+        <div className="stat-card">
+          <div className="stat-value" style={{ color: '#EF9F27' }}>{stats.assigned}</div>
+          <div className="stat-label">Assignées</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value" style={{ color: '#E05050' }}>{stats.pending}</div>
+          <div className="stat-label">En attente</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value">
+            {positions.filter(p => p.eta_minutes != null && p.eta_minutes < 30).length}
+          </div>
+          <div className="stat-label">Arrivent bientôt</div>
         </div>
       </div>
 
-      <div className="tp-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <MapView
-          height="560px"
-          center={[33.9716, -6.8498]}
-          zoom={6}
-          livePositions={positions}
-        />
-      </div>
+      {loading ? (
+        <div className="loading-text">Chargement de la carte...</div>
+      ) : positions.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🗺️</div>
+          <div style={{ fontWeight: 500, marginBottom: 6 }}>Aucune livraison active</div>
+          <div style={{ fontSize: 13, color: '#888' }}>
+            Les camions apparaissent ici une fois que les transporteurs démarrent les livraisons
+          </div>
+        </div>
+      ) : (
+        <>
+          <LiveMap positions={positions} height="480px" zoom={6} />
+
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
+              Détails des livraisons actives
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {positions.map((pos) => (
+                <div key={pos.vehicle_id} className="card" style={{ padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 12 }}>
+                        🚚 {pos.plate} &nbsp;·&nbsp;
+                        <span style={{ color: '#378ADD' }}>{pos.order_number}</span> &nbsp;·&nbsp;
+                        🏢 {pos.transporter_name}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+                        📍 {pos.departure_city} → 🏁 {pos.destination_city} &nbsp;·&nbsp;
+                        👤 {pos.driver_name || '—'} &nbsp;·&nbsp;
+                        👥 {pos.client_name || '—'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                      {pos.eta_minutes != null ? (
+                        <div style={{
+                          fontWeight: 700, fontSize: 14,
+                          color: pos.eta_minutes < 30 ? '#1D9E75' : '#378ADD'
+                        }}>
+                          {pos.eta_minutes < 60
+                            ? `${pos.eta_minutes} min`
+                            : `${Math.floor(pos.eta_minutes / 60)}h${pos.eta_minutes % 60}min`}
+                        </div>
+                      ) : (
+                        <span className="badge badge-info" style={{ fontSize: 10 }}>En transit</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+      `}</style>
     </div>
   );
 }

@@ -76,22 +76,22 @@ export default function AdminDashboard() {
 
       if (ordersRes.status === 'fulfilled') {
         const data = ordersRes.value.data.results || ordersRes.value.data || [];
-        setOrders(Array.isArray(data) ? data.slice(0, 6) : []);
+        setOrders(Array.isArray(data) ? data : []);
       }
 
       if (vRes.status === 'fulfilled') {
         const data = vRes.value.data.results || vRes.value.data || [];
-        setVehicles(Array.isArray(data) ? data.slice(0, 5) : []);
+        setVehicles(Array.isArray(data) ? data : []);
       }
 
       if (dRes.status === 'fulfilled') {
         const data = dRes.value.data.results || dRes.value.data || [];
-        setDrivers(Array.isArray(data) ? data.slice(0, 5) : []);
+        setDrivers(Array.isArray(data) ? data : []);
       }
 
       if (tRes.status === 'fulfilled') {
         const data = tRes.value.data.results || tRes.value.data || [];
-        setTransporters(Array.isArray(data) ? data.slice(0, 5) : []);
+        setTransporters(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error('ADMIN DASHBOARD ERROR:', err);
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
     {
       icon: <Users size={20} />,
       label: 'Chauffeurs disponibles',
-      value: drivers.filter(d => d.status === 'available').length,
+      value: drivers.filter(d => d.is_available === true).length,
       color: 'green',
     },
   ];
@@ -291,7 +291,7 @@ export default function AdminDashboard() {
                   <div className="tp-list-icon"><Truck size={22} /></div>
                   <div className="tp-list-body">
                     <strong>{v.plate_number}</strong>
-                    <small>{v.transporter_name || v.vehicle_type || '—'}</small>
+                    <small>{v.brand} {v.model} · {v.capacity_kg} kg</small>
                   </div>
                   <StatusBadge status={v.status} />
                 </div>
@@ -318,7 +318,7 @@ export default function AdminDashboard() {
                     <strong>{d.first_name} {d.last_name}</strong>
                     <small>{d.phone || '—'}</small>
                   </div>
-                  <StatusBadge status={d.status} />
+                  <StatusBadge status={d.is_available ? 'available' : 'on_delivery'} />
                 </div>
               ))}
             </div>

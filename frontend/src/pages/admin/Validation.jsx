@@ -113,26 +113,31 @@ export default function AdminValidation() {
     return drivers.filter((d) => Number(d.transporter) === Number(transporterId));
   };
 
-  const validateOrder = async (order) => {
-    setActionLoading(`validate-${order.id}`);
-
-    try {
-      await ordersAPI.validate(order.id);
-
+ const validateOrder = async (order) => {
+  setActionLoading(`validate-${order.id}`);
+  try {
+    const res = await ordersAPI.validate(order.id);
+    const data = res.data;
+    
+    // If auto-assigned successfully, remove from both lists
+    if (data.status === 'assigned') {
+      setPending((prev) => prev.filter((o) => o.id !== order.id));
+      toast.success(data.message || 'Commande validée et assignée automatiquement ✅');
+    } else {
+      // Validated but not assigned — move to "À assigner"
       setPending((prev) => prev.filter((o) => o.id !== order.id));
       setValidated((prev) => [
         { ...order, status: 'validated', validated_at: new Date().toISOString() },
         ...prev,
       ]);
-
-      toast.success('Commande validée. Vous pouvez maintenant l’assigner.');
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Impossible de valider.');
-    } finally {
-      setActionLoading(null);
+      toast.success('Commande validée. Assignation automatique échouée — assignez manuellement.');
     }
-  };
-
+  } catch (err) {
+    toast.error(err.response?.data?.error || 'Impossible de valider.');
+  } finally {
+    setActionLoading(null);
+  }
+};
   const assignManual = async (order) => {
     const form = assignForm[order.id] || {};
 
@@ -162,19 +167,18 @@ export default function AdminValidation() {
     }
   };
 
-  const autoAssign = async (order) => {
-    setActionLoading(`auto-${order.id}`);
-
-    try {
-      const res = await ordersAPI.autoAssign(order.id);
-      setValidated((prev) => prev.filter((o) => o.id !== order.id));
-      toast.success(res.data.message || 'Commande auto-assignée.');
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Aucun transporteur disponible.');
-    } finally {
-      setActionLoading(null);
-    }
-  };
+const autoAssign = async (order) => {
+  setActionLoading(`auto-${order.id}`);
+  try {
+    const res = await ordersAPI.retryAssign(order.id);
+    setValidated((prev) => prev.filter((o) => o.id !== order.id));
+    toast.success(res.data.message || 'Commande auto-assignée ✅');
+  } catch (err) {
+    toast.error(err.response?.data?.error || 'Aucun transporteur disponible.');
+  } finally {
+    setActionLoading(null);
+  }
+};
 
   const updateForm = (orderId, field, value) => {
     setAssignForm((prev) => ({

@@ -1,56 +1,117 @@
-import React, { useEffect, useState } from 'react';
-import { ordersAPI } from '../../services/api';
-import { useTracking } from '../../hooks/useTracking';
-import MapView from '../../components/map/MapView';
+import React, { useEffect, useState, useRef } from 'react';
+import { trackingAPI, ordersAPI } from '../../services/api';
+import LiveMap from '../../components/map/LiveMap';
 
 export default function ClientMap() {
+  const [positions, setPositions] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const { position, connected } = useTracking(selected?.id);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const intervalRef = useRef(null);
+
+  const fetchData = async () => {
+    try {
+      const [posRes, ordersRes] = await Promise.all([
+        trackingAPI.livePositions(),
+        ordersAPI.list({ status: 'in_transit' }),
+      ]);
+      setPositions(posRes.data || []);
+      setOrders(ordersRes.data.results || ordersRes.data || []);
+      setLastUpdate(new Date());
+    } catch (err) {
+      console.error('Map fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    ordersAPI.list({ status: 'in_transit' }).then(res => {
-      const data = res.data.results || res.data;
-      setOrders(data);
-      if (data.length > 0) setSelected(data[0]);
-    }).catch(() => {});
+    fetchData();
+    intervalRef.current = setInterval(fetchData, 5000);
+    return () => clearInterval(intervalRef.current);
   }, []);
+
+  const assignedOrders = orders.filter(o => o.status === 'in_transit');
 
   return (
     <div className="page-container">
-      <h1 className="page-title">Live tracking 🗺️</h1>
-      {orders.length === 0 ? (
-        <div className="empty-text">No active deliveries in transit right now.</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h1 className="page-title" style={{ margin: 0 }}>Suivi en temps réel 🗺️</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1D9E75', animation: 'pulse 2s infinite' }} />
+          <span style={{ fontSize: 12, color: '#888' }}>
+            {lastUpdate ? `Mis à jour ${lastUpdate.toLocaleTimeString()}` : 'Connexion...'}
+          </span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading-text">Chargement de la carte...</div>
+      ) : positions.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: 40 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🚚</div>
+          <div style={{ fontWeight: 500, marginBottom: 6 }}>Aucune livraison en cours</div>
+          <div style={{ fontSize: 13, color: '#888' }}>
+            La carte s'animera dès que votre commande sera en transit
+          </div>
+        </div>
       ) : (
         <>
-          <div className="filter-row" style={{ marginBottom: 12 }}>
-            {orders.map(o => (
-              <button key={o.id} className={`btn-sm ${selected?.id === o.id ? 'btn-primary' : ''}`} onClick={() => setSelected(o)}>
-                {o.order_number}
-              </button>
+          <LiveMap positions={positions} height="440px" />
+
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {positions.map((pos) => (
+              <div key={pos.vehicle_id || pos.order_id} className="card" style={{ padding: '12px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>
+                      {pos.order_number} — {pos.departure_city} → {pos.destination_city}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#888', marginTop: 3 }}>
+                      🚚 {pos.plate} &nbsp;·&nbsp;
+                      👤 {pos.driver_name || '—'} &nbsp;·&nbsp;
+                      🏢 {pos.transporter_name || '—'}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    {pos.eta_minutes != null && (
+                      <div style={{ fontWeight: 700, fontSize: 16, color: '#378ADD' }}>
+                        {pos.eta_minutes < 60
+                          ? `${pos.eta_minutes} min`
+                          : `${Math.floor(pos.eta_minutes / 60)}h ${pos.eta_minutes % 60}min`}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: '#aaa' }}>Temps restant estimé</div>
+                  </div>
+                </div>
+
+                {/* Progress bar based on remaining distance */}
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888', marginBottom: 4 }}>
+                    <span>📍 {pos.departure_city}</span>
+                    <span style={{ color: '#378ADD' }}>🚚 En transit</span>
+                    <span>🏁 {pos.destination_city}</span>
+                  </div>
+                  <div style={{ height: 5, background: '#E8EAED', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 3, background: '#378ADD',
+                      width: pos.eta_minutes != null ? `${Math.max(10, Math.min(90, 100 - (pos.eta_minutes / 120 * 100)))}%` : '50%',
+                      transition: 'width 1s ease',
+                    }} />
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
-          {selected && (
-            <div className="card" style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 500 }}>{selected.order_number} — {selected.departure_city} → {selected.destination_city}</div>
-              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                Driver: {selected.driver_name || 'N/A'} · Truck: {selected.vehicle_plate || 'N/A'} ·
-                <span style={{ color: connected ? '#1D9E75' : '#E05050', marginLeft: 6 }}>
-                  {connected ? '● Live' : '○ Offline'}
-                </span>
-              </div>
-            </div>
-          )}
-          <MapView
-            height="420px"
-            center={[33.9716, -6.8498]}
-            zoom={7}
-            truckPosition={position}
-            departure={selected ? { lat: 33.5731, lng: -7.5898, label: selected.departure_city } : null}
-            destination={selected ? { lat: 34.0209, lng: -6.8416, label: selected.destination_city } : null}
-          />
         </>
       )}
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
   );
 }

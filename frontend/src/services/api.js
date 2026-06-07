@@ -8,11 +8,9 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-
   return config;
 });
 
@@ -31,6 +29,7 @@ export const ordersAPI = {
   validate: (id) => api.post(`/orders/${id}/validate/`),
   assign: (id, data) => api.post(`/orders/${id}/assign/`, data),
   autoAssign: (orderId) => api.post('/orders/auto-assign/', { order_id: orderId }),
+  retryAssign: (id) => api.post(`/orders/${id}/retry-assign/`),
 
   start: (id) => api.post(`/orders/${id}/start/`),
   deliver: (id) => api.post(`/orders/${id}/deliver/`),
@@ -61,6 +60,7 @@ export const transportersAPI = {
 
 export const trackingAPI = {
   livePositions: () => api.get('/tracking/live/'),
+  updatePosition: (data) => api.post('/tracking/update-position/', data),
 };
 
 export default api;
