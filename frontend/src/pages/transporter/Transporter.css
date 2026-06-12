@@ -16,7 +16,7 @@
     --g-400: #40916c;
     --g-300: #74c69d;
     --g-200: #b7e4c7;
-    --g-100: #d8f3dc;
+    --g-100: #d8d9f3;
     --g-50: #f0faf2;
 
     --lime: #b5e550;
@@ -28,7 +28,7 @@
     --sand: #f5f4ef;
     --white: #ffffff;
 
-    --border: #e2e8e0;
+    --border: #e8e0e0;
     --shadow-sm: 0 1px 4px rgba(0, 0, 0, .06);
     --shadow-md: 0 4px 20px rgba(0, 0, 0, .08);
     --shadow-lg: 0 12px 40px rgba(0, 0, 0, .12);

@@ -228,19 +228,22 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='start')
     def start_delivery(self, request, pk=None):
         order = self.get_object()
-
         if request.user.role != 'transporter':
             return Response({'error': 'Transporter only.'}, status=403)
-
         if not order.transporter or order.transporter.user != request.user:
             return Response({'error': 'This order is not assigned to you.'}, status=403)
-
         if order.status != 'assigned':
             return Response({'error': 'Order not yet assigned.'}, status=400)
 
         order.status = 'in_transit'
         order.started_at = timezone.now()
         order.save()
+
+        # ── Auto-set vehicle GPS to pickup point when delivery starts ──
+        if order.vehicle and order.departure_point:
+            order.vehicle.current_location = order.departure_point
+            order.vehicle.last_seen = timezone.now()
+            order.vehicle.save(update_fields=['current_location', 'last_seen'])
 
         return Response({
             'message': 'Delivery started.',

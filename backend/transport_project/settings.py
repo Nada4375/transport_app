@@ -1,5 +1,5 @@
 import os
-os.environ['GDAL_LIBRARY_PATH'] = r'C:\Users\HP\anaconda3\annaconda\envs\geoatelier\Library\bin\gdal.dll'
+
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -65,9 +65,9 @@ TEMPLATES = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'transport_db',
+        'NAME': 'transport_app_v2',
         'USER': 'postgres',
-        'PASSWORD': 'nada123',
+        'PASSWORD': 'bad123',
         'HOST': '127.0.0.1',
         'PORT': '5432',
     }
@@ -119,5 +119,4 @@ USE_I18N = True
 USE_TZ = True
 
 
-GDAL_LIBRARY_PATH = r"C:\Users\HP\anaconda3\annaconda\envs\geoatelier\Library\bin\gdal.dll"
-
+GDAL_LIBRARY_PATH = r"C:\Users\HP\anaconda3\envs\geoatelier\Library\bin\gdal.dll"
