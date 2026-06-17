@@ -65,9 +65,9 @@ TEMPLATES = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'transport_app_v2',
+        'NAME': 'transport_db',
         'USER': 'postgres',
-        'PASSWORD': 'bad123',
+        'PASSWORD': 'nada123',
         'HOST': '127.0.0.1',
         'PORT': '5432',
     }
@@ -119,4 +119,4 @@ USE_I18N = True
 USE_TZ = True
 
 
-GDAL_LIBRARY_PATH = r"C:\Users\HP\anaconda3\envs\geoatelier\Library\bin\gdal.dll"
+GDAL_LIBRARY_PATH = r"C:\Users\HP\anaconda3\annaconda\envs\geoatelier\Library\bin\gdal.dll"
